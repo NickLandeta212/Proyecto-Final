@@ -1,6 +1,57 @@
 #include "funciones.h"
+#include <stdio.h>
+// Función para limpiar la pantalla
+void limpiar_pantalla() {
+    #ifdef _WIN32
+        system("cls");
+    #else
+        system("clear");
+    #endif
+}
 
-// Función para cargar los límites de contaminación establecidos por la OMS
+// Función para pausar la ejecución
+void pausar() {
+    printf("\nPresione Enter para continuar...");
+    getchar(); // Capturar el Enter anterior
+    getchar(); // Esperar nuevo Enter
+}
+
+// Función para mostrar el menú principal
+int menu_principal() {
+    int opcion;
+
+    limpiar_pantalla();
+    printf("\n--------------------------------------------------\n");
+    printf("      SISTEMA DE MONITOREO DE CONTAMINACION       \n");
+    printf("----------------------------------------------------\n\n");
+    printf(" [1] Ver estado actual de contaminacion\n");
+    printf(" [2] Ver predicciones para las proximas 24h\n");
+    printf(" [3] Ver promedios historicos\n");
+    printf(" [4] Ver recomendaciones de accion\n");
+    printf(" [5] Ingresar nuevos datos de monitoreo\n");
+    printf(" [6] Exportar informacion a archivo\n");
+    printf(" [7] Agregar nueva ciudad\n");
+    printf(" [0] Salir del sistema\n\n");
+    printf("Seleccione una opcion: ");
+    scanf("%d", &opcion);
+
+    return opcion;
+}
+
+// Datos históricos aproximados para Ecuador en los últimos 30 días
+const float datos_historicos_ecuador[DIAS_HISTORICO][4] = {
+    {400.0, 20.0, 25.0, 15.0}, {410.0, 22.0, 26.0, 16.0}, {405.0, 21.0, 24.0, 14.5},
+    {420.0, 23.0, 27.0, 17.0}, {415.0, 22.5, 26.5, 16.5}, {430.0, 24.0, 28.0, 18.0},
+    {440.0, 25.0, 29.0, 19.0}, {435.0, 24.5, 28.5, 18.5}, {450.0, 26.0, 30.0, 20.0},
+    {445.0, 25.5, 29.5, 19.5}, {460.0, 27.0, 31.0, 21.0}, {455.0, 26.5, 30.5, 20.5},
+    {470.0, 28.0, 32.0, 21.0}, {465.0, 27.5, 31.5, 20.5}, {480.0, 29.0, 33.0, 22.0},
+    {475.0, 28.5, 32.5, 21.5}, {490.0, 30.0, 34.0, 23.0}, {485.0, 29.5, 33.5, 22.5},
+    {500.0, 31.0, 35.0, 24.0}, {495.0, 30.5, 34.5, 23.5}, {510.0, 32.0, 36.0, 25.0},
+    {505.0, 31.5, 35.5, 24.5}, {520.0, 33.0, 37.0, 26.0}, {515.0, 32.5, 36.5, 25.5},
+    {530.0, 34.0, 38.0, 27.0}, {525.0, 33.5, 37.5, 26.5}, {540.0, 35.0, 39.0, 28.0},
+    {535.0, 34.5, 38.5, 27.5}, {550.0, 36.0, 40.0, 30.0}, {545.0, 35.5, 39.5, 29.5}
+};
+
 void cargar_limites_oms(struct Limites *limites) {
     // Valores oficiales según las guías de calidad del aire de la OMS (2021) para zonas urbanas, ya en unidades finales
     limites->co2 = 800.0;  // ppm (partes por millón) - Valor de referencia para ambientes urbanos
@@ -156,45 +207,35 @@ void evaluar_niveles_contaminacion(struct Zona *zona, struct Limites limites) {
 
 // Función para predecir niveles de contaminación
 void predecir_niveles(struct Zona *zona) {
-    // Factores de simulación basados en condiciones climáticas
-    float factor_viento = 1.0 - (zona->clima_actual.velocidad_viento / 100.0); // Más viento reduce contaminación
-    float factor_humedad = 1.0 + (zona->clima_actual.humedad / 200.0); // Más humedad incrementa retención
-    float factor_temperatura = 1.0 + (zona->clima_actual.temperatura / 100.0); // Mayor temperatura incrementa reacciones
-    
-    // Aplicar factores para simular predicción
-    zona->prediccion.niveles_predichos.co2 = zona->niveles_actuales.co2 * factor_temperatura * factor_humedad * factor_viento;
-    zona->prediccion.niveles_predichos.so2 = zona->niveles_actuales.so2 * factor_temperatura * factor_humedad * factor_viento;
-    zona->prediccion.niveles_predichos.no2 = zona->niveles_actuales.no2 * factor_temperatura * factor_humedad * factor_viento;
-    zona->prediccion.niveles_predichos.pm25 = zona->niveles_actuales.pm25 * factor_humedad * factor_viento;
-    
-    // Generar mensaje de alerta si es necesario
-    if (zona->prediccion.niveles_predichos.co2 > zona->niveles_actuales.co2 ||
-        zona->prediccion.niveles_predichos.so2 > zona->niveles_actuales.so2 ||
-        zona->prediccion.niveles_predichos.no2 > zona->niveles_actuales.no2 ||
-        zona->prediccion.niveles_predichos.pm25 > zona->niveles_actuales.pm25) {
-        
-        sprintf(zona->prediccion.alerta, 
-                "ALERTA: Se preve un incremento en los niveles en la zona %s",
-                zona->nombre);
+    float factor_viento = 1.0 - (zona->clima_actual.velocidad_viento / 100.0);
+    float factor_humedad = 1.0 + (zona->clima_actual.humedad / 200.0);
+    float factor_temperatura = 1.0 + (zona->clima_actual.temperatura / 100.0);
+
+    zona->prediccion.niveles_predichos.co2 = zona->historico.promedios_co2 * factor_temperatura * factor_humedad * factor_viento;
+    zona->prediccion.niveles_predichos.so2 = zona->historico.promedios_so2 * factor_temperatura * factor_humedad * factor_viento;
+    zona->prediccion.niveles_predichos.no2 = zona->historico.promedios_no2 * factor_temperatura * factor_humedad * factor_viento;
+    zona->prediccion.niveles_predichos.pm25 = zona->historico.promedios_pm25 * factor_humedad * factor_viento;
+
+    if (zona->prediccion.niveles_predichos.co2 > zona->historico.promedios_co2 ||
+        zona->prediccion.niveles_predichos.so2 > zona->historico.promedios_so2 ||
+        zona->prediccion.niveles_predichos.no2 > zona->historico.promedios_no2 ||
+        zona->prediccion.niveles_predichos.pm25 > zona->historico.promedios_pm25) {
+
+        sprintf(zona->prediccion.alerta, "ALERTA: Se preve un incremento en los niveles en la zona %s", zona->nombre);
     } else {
         strcpy(zona->prediccion.alerta, "No hay alertas previstas para las proximas 24 horas");
     }
 }
 
 // Función para simular datos históricos
-void simular_datos_historicos(struct Zona *zona, struct Limites limites) {
-    srand(time(NULL)); // Semilla para números aleatorios
-    
-    // Simulación de datos históricos de los últimos 30 días
+void simular_datos_historicos(struct Zona *zona, struct Limites limites, int indice_zona) {
     for (int i = 0; i < DIAS_HISTORICO; i++) {
-        // Factor aleatorio entre 0.8 y 1.2 (80% - 120% del límite)
-        float factor_aleatorio = 0.8 + (float)rand() / RAND_MAX * 0.4;
-        
-        // Generar valores aleatorios alrededor de los límites
-        zona->historico.datos[i].co2 = limites.co2 * factor_aleatorio;
-        zona->historico.datos[i].so2 = limites.so2 * factor_aleatorio;
-        zona->historico.datos[i].no2 = limites.no2 * factor_aleatorio;
-        zona->historico.datos[i].pm25 = limites.pm25 * factor_aleatorio;
+        float factor_zona = 1.0 + (indice_zona * 0.05); // Factor único por zona
+
+        zona->historico.datos[i].co2 = datos_historicos_ecuador[i][0] * factor_zona;
+        zona->historico.datos[i].so2 = datos_historicos_ecuador[i][1] * factor_zona;
+        zona->historico.datos[i].no2 = datos_historicos_ecuador[i][2] * factor_zona;
+        zona->historico.datos[i].pm25 = datos_historicos_ecuador[i][3] * factor_zona;
     }
 }
 
@@ -521,7 +562,7 @@ void agregar_ciudad(struct SistemaMonitoreo *sistema, struct Limites limites) {
     for (int i = 0; i < nueva_ciudad->num_zonas; i++) {
         ingresar_datos_zona(&nueva_ciudad->zonas[i]);
         evaluar_niveles_contaminacion(&nueva_ciudad->zonas[i], limites);
-        simular_datos_historicos(&nueva_ciudad->zonas[i], limites);
+        simular_datos_historicos(&nueva_ciudad->zonas[i], limites, i);
         calcular_promedios_historicos(&nueva_ciudad->zonas[i]);
         predecir_niveles(&nueva_ciudad->zonas[i]);
         generar_recomendaciones(&nueva_ciudad->zonas[i], limites);
@@ -612,3 +653,4 @@ int cargar_ciudades(struct SistemaMonitoreo *sistema) {
     fclose(archivo);
     return 1; // Éxito
 }
+
